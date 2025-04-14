@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Provolone Launcher</title>
+    <style>
+        /* --- Estilos Generales --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0; /* Quitar margen por defecto */
+            padding: 0; /* Quitar padding por defecto */
+            background-color: #007F00; /* Verde Mercadona */
+            color: #FFFFFF; /* Texto principal blanco */
+            display: flex; /* Centrar contenido */
+            justify-content: center;
+            align-items: flex-start; /* Alinear arriba */
+            min-height: 100vh; /* Asegurar altura mínima */
+            padding-top: 20px; /* Espacio arriba */
+        }
+        #app-container {
+             width: 100%;
+             max-width: 500px; /* Ancho máximo para el contenido */
+             padding: 15px;
+             box-sizing: border-box; /* Incluir padding en el ancho */
+        }
+
+        .view { display: none; background-color: #FFFFFF; color: #000000; border-radius: 8px; padding: 20px; margin-top: 15px; border: none;}
+        .view.active { display: block; }
+        .view h2 { color: #007F00; text-align: center; margin-top: 0;} /* Título de vistas en verde */
+
+        .back-button { margin-top: 20px; margin-bottom: 10px; padding: 8px 15px; cursor: pointer; background-color: #f0f0f0; color: #333; border: 1px solid #ccc; border-radius: 4px; font-size: 0.9em;}
+        .back-button:hover { background-color: #e0e0e0; }
+
+        label { display: block; margin-top: 15px; margin-bottom: 5px; font-weight: bold; color: #333; }
+        textarea { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid #ccc; font-family: sans-serif; min-height: 80px; margin-bottom: 10px; border-radius: 4px;}
+        .status-text { font-style: italic; color: #555; margin-bottom: 10px; min-height: 1.2em; }
+        .response-area { margin-top: 5px; padding: 15px; border: 1px solid #e0e0e0; background-color: #f9f9f9; white-space: pre-wrap; min-height: 60px; font-family: monospace; color: #333; border-radius: 4px;}
+
+        /* --- Estilos Launcher --- */
+        #launcher-view {
+            background-color: transparent; /* Fondo transparente para la vista lanzadera */
+            border: none;
+            padding: 0;
+            text-align: center; /* Centrar título */
+        }
+         #launcher-view h2 {
+            color: #FFFFFF; /* Título blanco */
+            margin-bottom: 30px;
+            font-size: 1.8em;
+         }
+        .launcher-options-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 15px; /* Espacio entre botones */
+        }
+        .launcher-option {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background-color: #FFFFFF; /* Fondo blanco */
+            color: #000000; /* Texto negro */
+            border: 1px solid #E0E0E0;
+            border-radius: 12px; /* Bordes redondeados */
+            width: 85%; /* Ancho relativo */
+            max-width: 350px;
+            min-height: 100px; /* Altura mínima */
+            padding: 20px;
+            box-sizing: border-box;
+            text-align: center;
+            cursor: pointer;
+            transition: background-color 0.2s ease, transform 0.1s ease; /* Transición suave */
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .launcher-option:hover {
+             background-color: #f5f5f5; /* Gris muy claro al pasar el ratón */
+        }
+         .launcher-option:active {
+             transform: scale(0.98); /* Efecto al pulsar */
+         }
+        .launcher-option .icon {
+            font-size: 2.8em; /* Tamaño grande para el icono */
+            margin-bottom: 10px; /* Espacio bajo el icono */
+            line-height: 1;
+        }
+        .launcher-option .label {
+            font-size: 1.1em;
+            font-weight: 500;
+        }
+
+        /* --- Estilos específicos vistas internas --- */
+        /* MariaVision */
+        #mariavision-view video { display: block; width: 100%; max-width: 400px; /* Limitar ancho vídeo */ height: auto; border: 1px solid #ccc; background-color: #eee; margin: 15px auto; border-radius: 4px; }
+        #mariavision-view canvas { display: none; }
+        #mariavision-view textarea#promptInputMV { min-height: 60px; }
+        #mariavision-view button#captureButtonMV { display: block; width: 60%; margin: 15px auto; padding: 12px; font-size: 1em; cursor: pointer; background-color: #007F00; color: white; border: none; border-radius: 5px; }
+        #mariavision-view button#captureButtonMV:hover { background-color: #005900; }
+        #mariavision-view button#captureButtonMV:disabled { background-color: #cccccc; }
+
+        /* Pregunta (por voz / texto) */
+         #pregunta-view textarea#preguntaInput { min-height: 100px; }
+         #pregunta-view button#askButton { display: block; width: 60%; margin: 15px auto; padding: 12px; font-size: 1em; cursor: pointer; background-color: #007F00; color: white; border: none; border-radius: 5px; }
+         #pregunta-view button#askButton:hover { background-color: #005900; }
+         #pregunta-view button#askButton:disabled { background-color: #cccccc; }
+
+    </style>
+</head>
+<body>
+
+    <div id="app-container">
+
+        <div id="launcher-view" class="view active">
+            <h2>Seleccione una opción</h2>
+            <div class="launcher-options-container">
+                <button class="launcher-option" onclick="showView('mariavision-view')">
+                    <span class="icon">📷</span>
+                    <span class="label">Hacer Foto (MariaVision)</span>
+                </button>
+                <button class="launcher-option" onclick="showView('pregunta-view')">
+                    <span class="icon">🎤</span>
+                    <span class="label">Preguntar por Voz</span>
+                </button>
+                <button class="launcher-option" onclick="showView('option3-view')">
+                    <span class="icon">🔧</span>
+                    <span class="label">Opción 3</span>
+                </button>
+                <button class="launcher-option" onclick="showView('option4-view')">
+                    <span class="icon">ℹ️</span>
+                    <span class="label">Opción 4</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="mariavision-view" class="view">
+            <h2>MariaVision (Cámara + Prompt)</h2>
+            <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
+            <video id="videoMV" autoplay playsinline muted></video>
+            <canvas id="canvasMV"></canvas>
+            <label for="promptInputMV">Prompt para la imagen (opcional):</label>
+            <textarea id="promptInputMV" placeholder="Ej: Describe esta imagen. ¿Qué objetos ves?"></textarea>
+            <button id="captureButtonMV">Capturar Foto y Analizar</button>
+            <div id="statusMV" class="status-text">Inicializando cámara...</div>
+            <label>Respuesta del Servidor:</label>
+            <div id="responseOutputMV" class="response-area">(Aquí aparecerá la respuesta)</div>
+        </div>
+
+        <div id="pregunta-view" class="view">
+            <h2>Preguntar por Voz (Entrada de texto por ahora)</h2>
+            <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
+            <label for="preguntaInput">Escribe tu pregunta:</label>
+            <textarea id="preguntaInput" placeholder="Escribe aquí tu consulta..."></textarea>
+            <button id="askButton">Enviar Pregunta</button>
+            <div id="pregunta-status" class="status-text">Esperando pregunta...</div>
+            <label>Respuesta de Maria:</label>
+            <div id="pregunta-responseOutput" class="response-area">(La respuesta aparecerá aquí)</div>
+        </div>
+
+        <div id="option3-view" class="view">
+            <h2>Opción 3</h2>
+            <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
+            <p>Contenido para la opción 3 irá aquí.</p>
+        </div>
+        <div id="option4-view" class="view">
+            <h2>Opción 4</h2>
+            <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
+            <p>Contenido para la opción 4 irá aquí.</p>
+        </div>
+
+    </div> <script>
+        // --- Lógica de Navegación SPA ---
+        const views = document.querySelectorAll('.view');
+        let currentStream = null;
+        function showView(viewId) {
+            console.log(`Intentando mostrar vista: ${viewId}`);
+            views.forEach(view => { view.classList.remove('active'); });
+            if (viewId !== 'mariavision-view' && currentStream) {
+                console.log("Saliendo de MariaVision, deteniendo cámara...");
+                currentStream.getTracks().forEach(track => track.stop());
+                currentStream = null;
+                 const videoEl = document.getElementById('videoMV');
+                 if (videoEl) videoEl.srcObject = null;
+                 const statusDivMaria = document.getElementById('statusMV');
+                 if(statusDivMaria) statusDivMaria.textContent = "Cámara detenida.";
+            }
+            const targetView = document.getElementById(viewId);
+            if (targetView) {
+                targetView.classList.add('active');
+                console.log(`Vista ${viewId} activada.`);
+                if (viewId === 'mariavision-view' && document.getElementById('videoMV')) {
+                    startCameraMV();
+                }
+            } else {
+                console.error(`Error: No se encontró la vista con ID ${viewId}`);
+                document.getElementById('launcher-view').classList.add('active');
+            }
+        }
+
+        // --- Lógica Específica de MariaVision ---
+        const videoMV = document.getElementById('videoMV');
+        const canvasMV = document.getElementById('canvasMV');
+        const captureButtonMV = document.getElementById('captureButtonMV');
+        const statusDivMV = document.getElementById('statusMV');
+        const responseOutputMV = document.getElementById('responseOutputMV');
+        const promptInputMV = document.getElementById('promptInputMV');
+
+        async function startCameraMV() { /* ... (Sin cambios) ... */
+            if (currentStream || !videoMV || !statusDivMV) return;
+            statusDivMV.textContent = "Solicitando permiso...";
+            console.log("Iniciando cámara para MariaVision...");
+            try {
+                currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                videoMV.srcObject = currentStream;
+                videoMV.onloadedmetadata = () => { videoMV.play(); console.log("Cámara MV iniciada."); statusDivMV.textContent = "Cámara lista."; };
+                videoMV.onerror = (e) => { console.error('Error video MV:', e); statusDivMV.textContent = 'Error video.'; };
+            } catch (err) {
+                console.error('Error acceso cámara MV:', err); statusDivMV.textContent = `Error cámara: ${err.name}`; responseOutputMV.textContent = "No se pudo iniciar cámara."; currentStream = null;
+            }
+         }
+
+        if (captureButtonMV) { /* ... (Listener sin cambios, lee promptInputMV) ... */
+             captureButtonMV.addEventListener('click', () => {
+                if (!currentStream || !videoMV.videoWidth || videoMV.readyState < videoMV.HAVE_METADATA) { statusDivMV.textContent = 'Cámara no lista.'; return; }
+                captureButtonMV.disabled = true;
+                statusDivMV.textContent = 'Capturando...';
+                responseOutputMV.textContent = '';
+                const context = canvasMV.getContext('2d');
+                canvasMV.width = videoMV.videoWidth;
+                canvasMV.height = videoMV.videoHeight;
+                context.drawImage(videoMV, 0, 0, canvasMV.width, canvasMV.height);
+                canvasMV.toBlob(async (blob) => {
+                    if (!blob) { statusDivMV.textContent = 'Error procesar.'; captureButtonMV.disabled = false; return; }
+                    statusDivMV.textContent = 'Enviando...';
+                    const formData = new FormData();
+                    formData.append('image', blob, 'capture.jpg');
+                    const promptValue = promptInputMV.value.trim(); // Lee el prompt
+                    formData.append('prompt', promptValue); // Lo añade
+                    console.log(`Enviando imagen con prompt: "${promptValue || '(Default)'}"`);
+                    try {
+                        const response = await fetch('/process-image', { method: 'POST', body: formData });
+                        const responseText = await response.text();
+                        if (!response.ok) { throw new Error(`Error ${response.status}: ${responseText || response.statusText}`); }
+                        responseOutputMV.textContent = responseText;
+                        statusDivMV.textContent = 'Respuesta recibida.';
+                    } catch (error) {
+                         console.error('Error fetch MV:', error); responseOutputMV.textContent = `Error: ${error.message}`; statusDivMV.textContent = 'Error comunicación.';
+                    } finally { captureButtonMV.disabled = false; }
+                }, 'image/jpeg', 0.85);
+            });
+         }
+
+        // --- Lógica Específica de Pregunta a Maria ---
+        /* ... (Sin cambios en la lógica JS de Pregunta a Maria) ... */
+        const preguntaInput = document.getElementById('preguntaInput');
+        const askButton = document.getElementById('askButton');
+        const preguntaStatus = document.getElementById('pregunta-status');
+        const preguntaResponseOutput = document.getElementById('pregunta-responseOutput');
+        if (askButton) {
+            askButton.addEventListener('click', async () => {
+                const promptValue = preguntaInput.value.trim();
+                if (!promptValue) { preguntaStatus.textContent = "Escribe una pregunta."; return; }
+                askButton.disabled = true;
+                preguntaStatus.textContent = 'Enviando...';
+                preguntaResponseOutput.textContent = '';
+                try {
+                    const response = await fetch('/ask-maria', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ prompt: promptValue }) });
+                    const responseText = await response.text();
+                    if (!response.ok) { throw new Error(`Error ${response.status}: ${responseText || response.statusText}`); }
+                    preguntaResponseOutput.textContent = responseText;
+                    preguntaStatus.textContent = 'Respuesta recibida.';
+                } catch (error) { console.error('Error fetch AskMaria:', error); preguntaResponseOutput.textContent = `Error: ${error.message}`; preguntaStatus.textContent = 'Error comunicación.'; }
+                finally { askButton.disabled = false; }
+            });
+        }
+
+        // --- Mostrar vista inicial ---
+        document.addEventListener('DOMContentLoaded', () => {
+            showView('launcher-view');
+        });
+    </script>
+
+</body>
+</html>
