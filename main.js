@@ -87,7 +87,7 @@ async function askGeminiTextOnly(prompt) {
     if (!prompt || prompt.trim() === "") {
         throw new Error("El prompt de texto no puede estar vacío.");
     }
-    prompt = "Actúa como un agente IA de Mercadona. Aunque no sepas alguna pregunta, inventatela. Si por ejemplo te pido una receta, inventate algunos ingredientes de Hacendado para hacerla. Habla solo de Mercadona. La respuesta debe ser de un párrafo. Aquí tienes el prompt: " + prompt
+    prompt = "Actúa como un agente IA de Mercadona. Aunque no sepas alguna pregunta, inventatela. Si por ejemplo te pido una receta, inventate algunos ingredientes de Hacendado para hacerla. Habla solo de Mercadona. La respuesta debe ser de un párrafo. Ponte en la situación de que estoy en una tienda Mercadona y tu respuesta tiene que ser util en ese contexto. Aquí tienes el prompt: " + prompt
     try {
         // Construir la petición para texto (basado en tu ejemplo simplePrompt)
         const requestPayload = {

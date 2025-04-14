@@ -123,12 +123,12 @@
                     <span class="label">Preguntar por Voz</span>
                 </button>
                 <button class="launcher-option" onclick="showView('option3-view')">
-                    <span class="icon">🔧</span>
-                    <span class="label">Opción 3</span>
+                    <span class="icon">🧮</span>
+                    <span class="label">Escanear Código de Barras</span>
                 </button>
                 <button class="launcher-option" onclick="showView('option4-view')">
-                    <span class="icon">ℹ️</span>
-                    <span class="label">Opción 4</span>
+                    <span class="icon">🔔</span>
+                    <span class="label">Llamar a un empleado</span>
                 </button>
             </div>
         </div>
@@ -171,10 +171,12 @@
     </div> <script>
         // --- Lógica de Navegación SPA ---
         const views = document.querySelectorAll('.view');
-        let currentStream = null;
+        let currentStream = null; // Para el stream de MariaVision
         function showView(viewId) {
             console.log(`Intentando mostrar vista: ${viewId}`);
             views.forEach(view => { view.classList.remove('active'); });
+
+            // Detener cámara Y VOZ si salimos de las vistas correspondientes
             if (viewId !== 'mariavision-view' && currentStream) {
                 console.log("Saliendo de MariaVision, deteniendo cámara...");
                 currentStream.getTracks().forEach(track => track.stop());
@@ -184,43 +186,49 @@
                  const statusDivMaria = document.getElementById('statusMV');
                  if(statusDivMaria) statusDivMaria.textContent = "Cámara detenida.";
             }
+             // Detener síntesis de voz si salimos de la vista de pregunta o cambiamos a otra
+             if (viewId !== 'pregunta-view') {
+                 window.speechSynthesis?.cancel();
+             }
+
             const targetView = document.getElementById(viewId);
             if (targetView) {
                 targetView.classList.add('active');
                 console.log(`Vista ${viewId} activada.`);
+                // Iniciar cámara solo si entramos en MariaVision y el elemento video existe
                 if (viewId === 'mariavision-view' && document.getElementById('videoMV')) {
                     startCameraMV();
                 }
             } else {
                 console.error(`Error: No se encontró la vista con ID ${viewId}`);
+                // Mostrar lanzadera por defecto si hay error
                 document.getElementById('launcher-view').classList.add('active');
             }
         }
 
-        // --- Lógica Específica de MariaVision ---
+        // --- Lógica Específica de MariaVision (CON Prompt Input) ---
         const videoMV = document.getElementById('videoMV');
         const canvasMV = document.getElementById('canvasMV');
         const captureButtonMV = document.getElementById('captureButtonMV');
         const statusDivMV = document.getElementById('statusMV');
         const responseOutputMV = document.getElementById('responseOutputMV');
-        const promptInputMV = document.getElementById('promptInputMV');
+        const promptInputMV = document.getElementById('promptInputMV'); // Referencia al textarea
 
-        async function startCameraMV() { /* ... (Sin cambios) ... */
+        async function startCameraMV() {
             if (currentStream || !videoMV || !statusDivMV) return;
             statusDivMV.textContent = "Solicitando permiso...";
-            console.log("Iniciando cámara para MariaVision...");
             try {
                 currentStream = await navigator.mediaDevices.getUserMedia({ video: true });
                 videoMV.srcObject = currentStream;
-                videoMV.onloadedmetadata = () => { videoMV.play(); console.log("Cámara MV iniciada."); statusDivMV.textContent = "Cámara lista."; };
-                videoMV.onerror = (e) => { console.error('Error video MV:', e); statusDivMV.textContent = 'Error video.'; };
+                videoMV.onloadedmetadata = () => { videoMV.play(); statusDivMV.textContent = "Cámara lista."; };
+                videoMV.onerror = (e) => { statusDivMV.textContent = 'Error video.'; };
             } catch (err) {
-                console.error('Error acceso cámara MV:', err); statusDivMV.textContent = `Error cámara: ${err.name}`; responseOutputMV.textContent = "No se pudo iniciar cámara."; currentStream = null;
+                statusDivMV.textContent = `Error cámara: ${err.name}`; responseOutputMV.textContent = "No se pudo iniciar cámara."; currentStream = null;
             }
          }
 
-        if (captureButtonMV) { /* ... (Listener sin cambios, lee promptInputMV) ... */
-             captureButtonMV.addEventListener('click', () => {
+        if (captureButtonMV) {
+             captureButtonMV.addEventListener('click', () => { // Listener para el botón de MariaVision
                 if (!currentStream || !videoMV.videoWidth || videoMV.readyState < videoMV.HAVE_METADATA) { statusDivMV.textContent = 'Cámara no lista.'; return; }
                 captureButtonMV.disabled = true;
                 statusDivMV.textContent = 'Capturando...';
@@ -234,8 +242,8 @@
                     statusDivMV.textContent = 'Enviando...';
                     const formData = new FormData();
                     formData.append('image', blob, 'capture.jpg');
-                    const promptValue = promptInputMV.value.trim(); // Lee el prompt
-                    formData.append('prompt', promptValue); // Lo añade
+                    const promptValue = promptInputMV.value.trim(); // Leer el prompt
+                    formData.append('prompt', promptValue); // Añadirlo
                     console.log(`Enviando imagen con prompt: "${promptValue || '(Default)'}"`);
                     try {
                         const response = await fetch('/process-image', { method: 'POST', body: formData });
@@ -243,6 +251,7 @@
                         if (!response.ok) { throw new Error(`Error ${response.status}: ${responseText || response.statusText}`); }
                         responseOutputMV.textContent = responseText;
                         statusDivMV.textContent = 'Respuesta recibida.';
+                        speakText(responseText);
                     } catch (error) {
                          console.error('Error fetch MV:', error); responseOutputMV.textContent = `Error: ${error.message}`; statusDivMV.textContent = 'Error comunicación.';
                     } finally { captureButtonMV.disabled = false; }
@@ -250,12 +259,68 @@
             });
          }
 
-        // --- Lógica Específica de Pregunta a Maria ---
-        /* ... (Sin cambios en la lógica JS de Pregunta a Maria) ... */
+        // --- Lógica Específica de Pregunta a Maria (CON TTS) ---
         const preguntaInput = document.getElementById('preguntaInput');
         const askButton = document.getElementById('askButton');
         const preguntaStatus = document.getElementById('pregunta-status');
         const preguntaResponseOutput = document.getElementById('pregunta-responseOutput');
+
+        // --- Inicio: Código para Text-to-Speech (Web Speech API) ---
+        let availableVoices = []; // Variable para guardar las voces
+
+        // Función para cargar las voces
+        function loadVoices() {
+            availableVoices = window.speechSynthesis.getVoices();
+            if (availableVoices.length > 0) {
+                 console.log("Voces cargadas:", availableVoices.filter(v => v.lang.startsWith('es')));
+            } else {
+                 window.speechSynthesis.onvoiceschanged = () => { // Esperar si no están listas
+                     availableVoices = window.speechSynthesis.getVoices();
+                     console.log("Voces cargadas (async):", availableVoices.filter(v => v.lang.startsWith('es')));
+                 };
+            }
+        }
+
+        // Intentar cargar voces al inicio (si la API existe)
+        if ('speechSynthesis' in window) {
+             loadVoices();
+             if (window.speechSynthesis.getVoices().length > 0) { loadVoices(); } // Doble check
+        } else {
+            console.error("Web Speech API (speechSynthesis) no soportada.");
+        }
+
+        // Función para hablar el texto
+        function speakText(textToSpeak) {
+            // Mejorar la selección de voz
+            const voices = window.speechSynthesis.getVoices();
+            console.log(voices)
+            const preferredVoices = [
+                'Grandma'
+            ];
+            
+            const voice = voices.find(v => preferredVoices.some(name => v.name.includes(name))) && 
+                        voices.find(v => v.lang.startsWith('es-ES'));
+            
+            // Configuración mejorada
+            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            utterance.voice = voice;
+            utterance.lang = voice ? voice.lang : 'es-ES';
+            utterance.rate = 0.9; // Velocidad más natural
+            utterance.pitch = 1; // Tono ligeramente más alto
+            
+            // Añadir pequeña pausa para dispositivos móviles
+            utterance.onboundary = (event) => {
+                if (event.name === 'sentence') {
+                    utterance.pause();
+                    setTimeout(() => utterance.resume(), 100);
+                }
+            };
+            
+            window.speechSynthesis.speak(utterance);
+        }
+        // --- Fin: Código para Text-to-Speech ---
+
+        // Listener del botón Ask (Modificado para llamar a speakText)
         if (askButton) {
             askButton.addEventListener('click', async () => {
                 const promptValue = preguntaInput.value.trim();
@@ -263,20 +328,38 @@
                 askButton.disabled = true;
                 preguntaStatus.textContent = 'Enviando...';
                 preguntaResponseOutput.textContent = '';
+                window.speechSynthesis?.cancel(); // Detener voz antes de nueva petición
+
                 try {
-                    const response = await fetch('/ask-maria', { method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ prompt: promptValue }) });
+                    const response = await fetch('/ask-maria', {
+                         method: 'POST', headers: { 'Content-Type': 'application/json', }, body: JSON.stringify({ prompt: promptValue })
+                     });
                     const responseText = await response.text();
                     if (!response.ok) { throw new Error(`Error ${response.status}: ${responseText || response.statusText}`); }
+
+                    // Mostrar respuesta en texto
                     preguntaResponseOutput.textContent = responseText;
-                    preguntaStatus.textContent = 'Respuesta recibida.';
-                } catch (error) { console.error('Error fetch AskMaria:', error); preguntaResponseOutput.textContent = `Error: ${error.message}`; preguntaStatus.textContent = 'Error comunicación.'; }
-                finally { askButton.disabled = false; }
+                    preguntaStatus.textContent = 'Respuesta recibida. Reproduciendo voz...';
+
+                    // << LLAMAR A LA FUNCIÓN TTS >>
+                    speakText(responseText);
+
+                } catch (error) {
+                     console.error('Error fetch AskMaria:', error); preguntaResponseOutput.textContent = `Error: ${error.message}`; preguntaStatus.textContent = 'Error comunicación.';
+                } finally { askButton.disabled = false; }
             });
         }
 
         // --- Mostrar vista inicial ---
         document.addEventListener('DOMContentLoaded', () => {
             showView('launcher-view');
+            // Intentar cargar las voces aquí también
+             if ('speechSynthesis' in window) {
+                loadVoices();
+                 if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.onvoiceschanged = loadVoices;
+                 }
+             }
         });
     </script>
 
