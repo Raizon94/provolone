@@ -9,9 +9,10 @@ import { GoogleGenAI } from "@google/genai";
 const app = express();
 const port = 3000;
 
+
 // <<< AÑADIR ESTO para parsear JSON en las peticiones POST >>>
 app.use(express.json());
-
+app.use(express.static(path.dirname(fileURLToPath(import.meta.url)))); // Servir archivos estáticos desde el directorio actual
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -130,6 +131,7 @@ async function askGeminiTextOnly(prompt) {
 app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
+
 
 // Endpoint para IMAGEN + prompt (opcional)
 app.post('/process-image', upload.single('image'), async (req, res) => {

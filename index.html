@@ -7,6 +7,7 @@
     <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
 
     <style>
+        
          .map-button {
             display: block;
             margin: 25px auto 15px auto; /* Más margen arriba */
@@ -202,7 +203,7 @@
             <div id="pregunta-responseOutput" class="response-area">(La respuesta aparecerá aquí)</div>
             <button id="showMapButton" class="map-button">🗺️ Mostrar mapa</button>
             <div id="mapContainer" style="text-align: center; margin-top: 15px;">
-                <img id="mapGif" src="logo.png" alt="Mapa Animado" style="display: none; max-width: 100%; border-radius: 5px;">
+                <img id="mapGif" src="mapa2.gif" alt="Mapa Animado" style="display: none; max-width: 100%; border-radius: 5px;">
                 
             </div>
             
@@ -224,16 +225,64 @@
             <button id="retryScanButton" class="retry-button" style="display: block;">🔄 Reintentar Escaneo</button>
         </div>
         <div id="option4-view" class="view">
-            <h2>Opción 4</h2>
+            <h2>Llamar a un Empleado</h2>
             <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
-            <p>Contenido para la opción 4 irá aquí.</p>
-        </div>
+       
+            <div id="employee-call-status" style="text-align: center; font-size: 1.2em; margin-top: 40px; padding: 20px; min-height: 3em; background-color: #f0f0f0; border-radius: 5px;">
+                Iniciando llamada...
+            </div>
+       
+            </div>
 
-    </div> <script>
+    </div> 
+    <script>
+        let employeeCallTimeoutId = null; // Para guardar el ID del temporizador
+
+        // --- Nueva función para manejar la secuencia de llamada ---
+        function startEmployeeCallSequence() {
+            const statusElement = document.getElementById('employee-call-status');
+            if (!statusElement) {
+                console.error("Elemento 'employee-call-status' no encontrado.");
+                return;
+            }
+
+            console.log("Iniciando secuencia de llamada a empleado.");
+            // Estado inicial: "Llamando..."
+            statusElement.innerHTML = `
+                Llamando a Empleado...
+                <div style="margin-top:10px; font-size: 2em;" class="calling-animation">📞</div>
+            `; // Puedes añadir una simple animación o icono
+
+            // Asegurarse de limpiar cualquier timeout anterior si se entra rápido varias veces
+            if (employeeCallTimeoutId) {
+                clearTimeout(employeeCallTimeoutId);
+            }
+
+            // Establecer el temporizador para cambiar el mensaje después de 3 segundos
+            employeeCallTimeoutId = setTimeout(() => {
+                // Comprobar si todavía estamos en la vista correcta antes de cambiar el texto
+                const currentActiveView = document.querySelector('.view.active');
+                if (currentActiveView && currentActiveView.id === 'option4-view' && statusElement) {
+                    console.log("Empleado localizado, actualizando estado.");
+                    statusElement.innerHTML = `
+                        <span style="font-weight: bold; color: #007F00;">¡Gabriel va en camino!</span>
+                        <div style="margin-top:10px; font-size: 2em;">👍</div>
+                    `; // Mensaje final
+                } else {
+                    console.log("Timeout llamada empleado finalizado, pero la vista ya no es activa.");
+                }
+                employeeCallTimeoutId = null; // Limpiar el ID una vez ejecutado
+            }, 3000); // 3000 milisegundos = 3 segundos
+        }
+
+
+
+
+        const showMapButton = document.getElementById('showMapButton');
+        const mapGif = document.getElementById('mapGif');
         
-        
-         const views = document.querySelectorAll('.view');
-         const retryScanButton = document.getElementById('retryScanButton');
+        const views = document.querySelectorAll('.view');
+        const retryScanButton = document.getElementById('retryScanButton');
         let currentStream = null; // Stream para MariaVision
         let barcodeStream = null; // <<< NUEVO: Stream para Barcode Scanner
         let barcodeReader = null; // <<< NUEVO: Lector de códigos de barras
@@ -250,56 +299,149 @@
                 startBarcodeScanner();
             });
         }
-        // <<< MODIFICAR showView para manejar streams y scanner >>>
-        function showView(viewId) {
-            console.log(`Intentando mostrar vista: ${viewId}`);
-            views.forEach(view => { view.classList.remove('active'); });
 
-            // --- Detener procesos de vistas anteriores ---
-            // Detener cámara MariaVision
-            if (viewId !== 'mariavision-view' && currentStream) {
-                console.log("Saliendo de MariaVision, deteniendo cámara...");
-                currentStream.getTracks().forEach(track => track.stop());
-                currentStream = null;
-                 const videoElMV = document.getElementById('videoMV');
-                 if (videoElMV) videoElMV.srcObject = null;
-                 const statusDivMV = document.getElementById('statusMV');
-                 if(statusDivMV) statusDivMV.textContent = "Cámara detenida.";
-            }
-            // Detener cámara y scanner de Códigos de Barras
-            if (viewId !== 'barcode-view' && barcodeReader) {
-                 console.log("Saliendo de Barcode Scan, deteniendo scanner y cámara...");
-                 barcodeReader.reset(); // Detiene el scanner ZXing
-                 barcodeReader = null;
-                 if (barcodeStream) {
-                    barcodeStream.getTracks().forEach(track => track.stop());
-                    barcodeStream = null;
-                 }
-                 const videoElBC = document.getElementById('barcodeVideo');
-                 if(videoElBC) videoElBC.srcObject = null; // Limpiar video
-                 // Resetear textos de la vista de barcode (opcional)
-                 resetBarcodeView();
-            }
-            // Detener TTS
-            window.speechSynthesis?.cancel(); // Si usas WebSpeech API
-            // ttsPlayer?.pause(); // Si usas Talkify
 
-            // --- Activar la nueva vista e iniciar sus procesos ---
-            const targetView = document.getElementById(viewId);
-            if (targetView) {
-                targetView.classList.add('active');
-                console.log(`Vista ${viewId} activada.`);
-                // Iniciar cámara/scanner según la vista
-                if (viewId === 'mariavision-view' && document.getElementById('videoMV')) {
-                    startCameraMV();
-                } else if (viewId === 'barcode-view' && document.getElementById('barcodeVideo')) {
-                    startBarcodeScanner(); // <<< NUEVA FUNCIÓN A LLAMAR
-                }
-            } else {
-                console.error(`Error: No se encontró la vista con ID ${viewId}`);
-                document.getElementById('launcher-view').classList.add('active');
+    function showView(viewId) {
+        console.log(`Intentando mostrar vista: ${viewId}`);
+
+        // 1. Identifica la vista activa ACTUAL ANTES de desactivarla
+        const currentActiveView = document.querySelector('.view.active');
+
+        // 2. CANCELAR TIMEOUT si estamos saliendo de option4-view
+        if (currentActiveView && currentActiveView.id === 'option4-view' && viewId !== 'option4-view') {
+            if (employeeCallTimeoutId) {
+                clearTimeout(employeeCallTimeoutId);
+                employeeCallTimeoutId = null;
+                console.log("Timeout llamada empleado cancelado al salir de la vista.");
+            }
+            // Resetear el texto en la vista de empleado al salir
+            const statusElement = document.getElementById('employee-call-status');
+            if (statusElement) {
+                // Puedes poner el texto inicial o dejarlo como estaba en el último estado
+                statusElement.innerHTML = 'Iniciando llamada...'; // O un estado neutro
             }
         }
+
+        // 3. Desactiva TODAS las vistas
+        views.forEach(view => { view.classList.remove('active'); });
+
+        // 4. Gestionar estado específico de la vista 'pregunta-view' (Mapa y TTS)
+        //    (Usando la lógica de animación del mapa con el contenedor que implementamos antes)
+        const mapContainer = document.getElementById('mapContainer');
+        const showMapButton = document.getElementById('showMapButton');
+
+        if (viewId !== 'pregunta-view') {
+            // Si SALIMOS de pregunta-view (o vamos a cualquier otra que no sea pregunta-view)
+            if (mapContainer) {
+                mapContainer.classList.remove('visible'); // Asegura que esté oculto
+                // Quita la transición temporalmente para ocultar instantáneamente al cambiar de vista
+                mapContainer.style.transition = 'none';
+                mapContainer.style.maxHeight = '0';
+                // Restaura la transición después de un breve instante para futuras animaciones
+                setTimeout(() => {
+                    if (mapContainer) mapContainer.style.transition = '';
+                }, 50);
+            }
+            if (showMapButton) showMapButton.textContent = '🗺️ Mostrar mapa'; // Restaura botón
+
+            // Detener TTS si estaba activo (generalmente en pregunta-view o barcode-view)
+            window.speechSynthesis?.cancel();
+
+        } else {
+            // Si ENTRAMOS a pregunta-view, asegurar estado inicial del mapa
+            if (mapContainer) {
+                mapContainer.classList.remove('visible');
+                mapContainer.style.maxHeight = '0'; // Asegura que esté cerrado
+            }
+            if (showMapButton) showMapButton.textContent = '🗺️ Mostrar mapa';
+        }
+
+        // 5. Detener otros procesos activos de vistas anteriores
+        // Detener cámara MariaVision
+        if (viewId !== 'mariavision-view' && currentStream) {
+            console.log("Saliendo de MariaVision, deteniendo cámara...");
+            currentStream.getTracks().forEach(track => track.stop());
+            currentStream = null;
+            const videoElMV = document.getElementById('videoMV');
+            if (videoElMV) videoElMV.srcObject = null;
+            const statusDivMV = document.getElementById('statusMV');
+            if (statusDivMV) statusDivMV.textContent = "Cámara detenida.";
+        }
+        // Detener cámara y scanner de Códigos de Barras
+        if (viewId !== 'barcode-view' && barcodeReader) {
+            console.log("Saliendo de Barcode Scan, deteniendo scanner y cámara...");
+            barcodeReader.reset(); // Detiene el proceso de decodificación de ZXing
+            barcodeReader = null;
+            if (barcodeStream) { // También detener el stream de video explícitamente
+                barcodeStream.getTracks().forEach(track => track.stop());
+                barcodeStream = null;
+            }
+            const videoElBC = document.getElementById('barcodeVideo');
+            if (videoElBC) videoElBC.srcObject = null; // Limpiar video
+            resetBarcodeView(); // Resetear textos de la vista barcode
+        }
+        // Detener TTS (ya se hace arriba específicamente al salir de pregunta-view,
+        // pero podemos dejar una cancelación general por si acaso otra vista lo usa)
+        // window.speechSynthesis?.cancel(); // Podría ser redundante aquí
+
+        // --- 6. Activar la nueva vista ---
+        const targetView = document.getElementById(viewId);
+        if (targetView) {
+            targetView.classList.add('active');
+            console.log(`Vista ${viewId} activada.`);
+
+            // --- 7. Iniciar procesos específicos de la NUEVA vista ---
+            if (viewId === 'mariavision-view' && document.getElementById('videoMV')) {
+                startCameraMV();
+            } else if (viewId === 'barcode-view' && document.getElementById('barcodeVideo')) {
+                startBarcodeScanner();
+            } else if (viewId === 'option4-view') { // <<<--- AÑADIDO ESTE CASO
+                startEmployeeCallSequence();        // <<<--- LLAMADA A LA FUNCIÓN
+            }
+            // La vista 'pregunta-view' no necesita una función de inicio aquí,
+            // su lógica se activa por interacción del usuario (escribir, botón 'ask').
+
+        } else {
+            // --- 8. Manejo de error si la vista no existe ---
+            console.error(`Error: No se encontró la vista con ID ${viewId}`);
+            // Volver a la vista lanzadera como fallback
+            const launcher = document.getElementById('launcher-view');
+            if (launcher) launcher.classList.add('active');
+        }
+    }
+
+ // --- Asegúrate de que la función startEmployeeCallSequence exista ---
+ // (La que definimos en la respuesta anterior)
+ function startEmployeeCallSequence() {
+    speakText("Llamando a un empleado... Por favor espere");
+     const statusElement = document.getElementById('employee-call-status');
+     if (!statusElement) {
+         console.error("Elemento 'employee-call-status' no encontrado.");
+         return;
+     }
+     console.log("Iniciando secuencia de llamada a empleado.");
+     statusElement.innerHTML = `
+         Llamando a Empleado...
+         <div style="margin-top:10px; font-size: 2em;" class="calling-animation">📞</div>
+     `;
+     if (employeeCallTimeoutId) {
+         clearTimeout(employeeCallTimeoutId);
+     }
+     employeeCallTimeoutId = setTimeout(() => {
+         const currentActiveView = document.querySelector('.view.active');
+         if (currentActiveView && currentActiveView.id === 'option4-view' && statusElement) {
+              console.log("Empleado localizado, actualizando estado.");
+              speakText("Gabriel va en camino. Por favor espere!")
+              statusElement.innerHTML = `
+                  <span style="font-weight: bold; color: #007F00;">¡Gabriel va en camino!</span>
+                  <div style="margin-top:10px; font-size: 2em;">👍</div>
+              `;
+         } else {
+              console.log("Timeout llamada empleado finalizado, pero la vista ya no es activa o el elemento no existe.");
+         }
+         employeeCallTimeoutId = null;
+     }, 10000);
+ }
         const barcodeVideoElement = document.getElementById('barcodeVideo');
         const barcodeStatusDiv = document.getElementById('barcodeStatus');
         const barcodeResultDiv = document.getElementById('barcodeResult');
@@ -657,6 +799,20 @@
         // Listener del botón Ask (Modificado para llamar a speakText)
         if (askButton) {
             askButton.addEventListener('click', async () => {
+                if (showMapButton && mapGif) {
+                    showMapButton.addEventListener('click', () => {
+                        // Comprobar si el GIF está visible o no y alternar
+                        if (mapGif.style.display === 'none') {
+                            mapGif.style.display = 'block'; // Mostrar GIF
+                            showMapButton.textContent = 'Ocultar mapa'; // Cambiar texto botón
+                            console.log("Mostrando GIF del mapa.");
+                        } else {
+                            mapGif.style.display = 'none'; // Ocultar GIF
+                            showMapButton.textContent = '🗺️ Mostrar mapa'; // Restaurar texto botón
+                            console.log("Ocultando GIF del mapa.");
+                        }
+                    });
+                }
                 const promptValue = preguntaInput.value.trim();
                 if (!promptValue) { preguntaStatus.textContent = "Escribe una pregunta."; return; }
                 askButton.disabled = true;
@@ -695,6 +851,8 @@
                  }
              }
         });
+
+        
     </script>
 
 </body>
