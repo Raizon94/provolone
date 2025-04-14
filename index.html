@@ -4,7 +4,37 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Provolone Launcher</title>
+    <script type="text/javascript" src="https://unpkg.com/@zxing/library@latest/umd/index.min.js"></script>
+
     <style>
+         .map-button {
+            display: block;
+            margin: 25px auto 15px auto; /* Más margen arriba */
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #4a90e2; /* Azul, por ejemplo */
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .map-button:hover {
+            background-color: #357abd;
+        }
+         #barcode-view video {
+            width: 100%;    
+            max-width: 400px;
+            height: auto;
+            border: 1px solid #ccc;
+            display: block;
+            margin: 10px auto;
+        }
+        #barcode-view #barcodeResult, #barcode-view #barcodeProductName {
+            font-weight: bold;
+            text-align: center;
+            margin: 10px 0;
+            min-height: 1.2em;
+        }
         /* --- Estilos Generales --- */
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
@@ -105,13 +135,28 @@
          #pregunta-view button#askButton:hover { background-color: #005900; }
          #pregunta-view button#askButton:disabled { background-color: #cccccc; }
 
+         .retry-button {
+            display: block; /* Para que ocupe su propia línea */
+            margin: 20px auto 10px auto; /* Margen arriba/abajo y centrado */
+            padding: 10px 20px;
+            font-size: 1em;
+            cursor: pointer;
+            background-color: #555; /* Un color diferente, ej: gris oscuro */
+            color: white;
+            border: none;
+            border-radius: 5px;
+        }
+        .retry-button:hover {
+            background-color: #444;
+        }
+
     </style>
 </head>
 <body>
-
     <div id="app-container">
-
+        
         <div id="launcher-view" class="view active">
+            
             <h2>Seleccione una opción</h2>
             <div class="launcher-options-container">
                 <button class="launcher-option" onclick="showView('mariavision-view')">
@@ -122,9 +167,9 @@
                     <span class="icon">🎤</span>
                     <span class="label">Preguntar por Voz</span>
                 </button>
-                <button class="launcher-option" onclick="showView('option3-view')">
-                    <span class="icon">🧮</span>
-                    <span class="label">Escanear Código de Barras</span>
+                <button class="launcher-option" onclick="showView('barcode-view')">
+                    <span class="icon">🅱️</span>
+                    <span class="label">Escanear Código Barras</span>
                 </button>
                 <button class="launcher-option" onclick="showView('option4-view')">
                     <span class="icon">🔔</span>
@@ -147,7 +192,7 @@
         </div>
 
         <div id="pregunta-view" class="view">
-            <h2>Preguntar por Voz (Entrada de texto por ahora)</h2>
+            <h2>Preguntar a MarIA</h2>
             <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
             <label for="preguntaInput">Escribe tu pregunta:</label>
             <textarea id="preguntaInput" placeholder="Escribe aquí tu consulta..."></textarea>
@@ -155,12 +200,28 @@
             <div id="pregunta-status" class="status-text">Esperando pregunta...</div>
             <label>Respuesta de Maria:</label>
             <div id="pregunta-responseOutput" class="response-area">(La respuesta aparecerá aquí)</div>
+            <button id="showMapButton" class="map-button">🗺️ Mostrar mapa</button>
+            <div id="mapContainer" style="text-align: center; margin-top: 15px;">
+                <img id="mapGif" src="logo.png" alt="Mapa Animado" style="display: none; max-width: 100%; border-radius: 5px;">
+                
+            </div>
+            
         </div>
 
-        <div id="option3-view" class="view">
-            <h2>Opción 3</h2>
+        <div id="barcode-view" class="view">
+            <h2>Escanear Código Barras</h2>
             <button class="back-button" onclick="showView('launcher-view')">← Volver al Menú</button>
-            <p>Contenido para la opción 3 irá aquí.</p>
+
+            <div>
+                <video id="barcodeVideo" playsinline></video> 
+            </div>
+            <div id="barcodeStatus" class="status-text">Apunte la cámara al código de barras...</div>
+            <div id="barcodeResult">Código detectado: ---</div>
+            <div id="barcodeProductName">Producto: ---</div>
+
+            <label>Explicación del Producto:</label>
+            <div id="barcodeResponseOutput" class="response-area">(La explicación aparecerá aquí)</div>
+            <button id="retryScanButton" class="retry-button" style="display: block;">🔄 Reintentar Escaneo</button>
         </div>
         <div id="option4-view" class="view">
             <h2>Opción 4</h2>
@@ -169,42 +230,291 @@
         </div>
 
     </div> <script>
-        // --- Lógica de Navegación SPA ---
-        const views = document.querySelectorAll('.view');
-        let currentStream = null; // Para el stream de MariaVision
+        
+        
+         const views = document.querySelectorAll('.view');
+         const retryScanButton = document.getElementById('retryScanButton');
+        let currentStream = null; // Stream para MariaVision
+        let barcodeStream = null; // <<< NUEVO: Stream para Barcode Scanner
+        let barcodeReader = null; // <<< NUEVO: Lector de códigos de barras
+        // Crear instancia global del reproductor Talkify o WebSpeech (según tu última elección)
+        // let ttsPlayer = ... (si usas Talkify) o la lógica de WebSpeech
+        if (retryScanButton) {
+            retryScanButton.addEventListener('click', () => {
+                window.speechSynthesis.cancel();
+                console.log("Botón Reintentar clickeado");
+                // Ocultarse a sí mismo
+                // Resetear la vista (opcional, startBarcodeScanner ya lo hace)
+                // resetBarcodeView();
+                // Volver a iniciar el escaneo
+                startBarcodeScanner();
+            });
+        }
+        // <<< MODIFICAR showView para manejar streams y scanner >>>
         function showView(viewId) {
             console.log(`Intentando mostrar vista: ${viewId}`);
             views.forEach(view => { view.classList.remove('active'); });
 
-            // Detener cámara Y VOZ si salimos de las vistas correspondientes
+            // --- Detener procesos de vistas anteriores ---
+            // Detener cámara MariaVision
             if (viewId !== 'mariavision-view' && currentStream) {
                 console.log("Saliendo de MariaVision, deteniendo cámara...");
                 currentStream.getTracks().forEach(track => track.stop());
                 currentStream = null;
-                 const videoEl = document.getElementById('videoMV');
-                 if (videoEl) videoEl.srcObject = null;
-                 const statusDivMaria = document.getElementById('statusMV');
-                 if(statusDivMaria) statusDivMaria.textContent = "Cámara detenida.";
+                 const videoElMV = document.getElementById('videoMV');
+                 if (videoElMV) videoElMV.srcObject = null;
+                 const statusDivMV = document.getElementById('statusMV');
+                 if(statusDivMV) statusDivMV.textContent = "Cámara detenida.";
             }
-             // Detener síntesis de voz si salimos de la vista de pregunta o cambiamos a otra
-             if (viewId !== 'pregunta-view') {
-                 window.speechSynthesis?.cancel();
-             }
+            // Detener cámara y scanner de Códigos de Barras
+            if (viewId !== 'barcode-view' && barcodeReader) {
+                 console.log("Saliendo de Barcode Scan, deteniendo scanner y cámara...");
+                 barcodeReader.reset(); // Detiene el scanner ZXing
+                 barcodeReader = null;
+                 if (barcodeStream) {
+                    barcodeStream.getTracks().forEach(track => track.stop());
+                    barcodeStream = null;
+                 }
+                 const videoElBC = document.getElementById('barcodeVideo');
+                 if(videoElBC) videoElBC.srcObject = null; // Limpiar video
+                 // Resetear textos de la vista de barcode (opcional)
+                 resetBarcodeView();
+            }
+            // Detener TTS
+            window.speechSynthesis?.cancel(); // Si usas WebSpeech API
+            // ttsPlayer?.pause(); // Si usas Talkify
 
+            // --- Activar la nueva vista e iniciar sus procesos ---
             const targetView = document.getElementById(viewId);
             if (targetView) {
                 targetView.classList.add('active');
                 console.log(`Vista ${viewId} activada.`);
-                // Iniciar cámara solo si entramos en MariaVision y el elemento video existe
+                // Iniciar cámara/scanner según la vista
                 if (viewId === 'mariavision-view' && document.getElementById('videoMV')) {
                     startCameraMV();
+                } else if (viewId === 'barcode-view' && document.getElementById('barcodeVideo')) {
+                    startBarcodeScanner(); // <<< NUEVA FUNCIÓN A LLAMAR
                 }
             } else {
                 console.error(`Error: No se encontró la vista con ID ${viewId}`);
-                // Mostrar lanzadera por defecto si hay error
                 document.getElementById('launcher-view').classList.add('active');
             }
         }
+        const barcodeVideoElement = document.getElementById('barcodeVideo');
+        const barcodeStatusDiv = document.getElementById('barcodeStatus');
+        const barcodeResultDiv = document.getElementById('barcodeResult');
+        const barcodeProductNameDiv = document.getElementById('barcodeProductName');
+        const barcodeResponseOutputDiv = document.getElementById('barcodeResponseOutput');
+
+        // Función para resetear la vista del escáner
+         function resetBarcodeView() {
+            if(barcodeStatusDiv) barcodeStatusDiv.textContent = 'Apunte la cámara al código de barras...';
+            if(barcodeResultDiv) barcodeResultDiv.textContent = 'Código detectado: ---';
+            if(barcodeProductNameDiv) barcodeProductNameDiv.textContent = 'Producto: ---';
+            if(barcodeResponseOutputDiv) barcodeResponseOutputDiv.textContent = '(La explicación aparecerá aquí)';
+         }
+
+
+        // Función para iniciar el escáner de código de barras
+        async function startBarcodeScanner() {
+        // Obtener referencia al video cada vez que se inicia
+        const barcodeVideoElement = document.getElementById('barcodeVideo');
+        if (!barcodeVideoElement) {
+            console.error("Elemento de video para barcode no encontrado.");
+            if(barcodeStatusDiv) barcodeStatusDiv.textContent = "Error: Elemento de video no encontrado.";
+            return;
+        }
+        // Salir si ya hay un lector activo
+        if (barcodeReader) {
+            console.log("El lector de códigos de barras ya está activo.");
+            return;
+        }
+
+     // Verificar si ZXing está cargado
+     if (typeof ZXing === 'undefined') {
+         console.error("Librería ZXing no cargada.");
+         if(barcodeStatusDiv) barcodeStatusDiv.textContent = "Error: Librería de escaneo no cargada.";
+         return;
+     }
+
+    console.log("Iniciando escáner de código de barras (modo continuo)...");
+    resetBarcodeView(); // Limpiar vista antes de empezar
+    barcodeStatusDiv.textContent = "Iniciando cámara...";
+
+    try {
+        // 1. Pedir permiso y obtener stream de cámara
+         barcodeStream = await navigator.mediaDevices.getUserMedia({
+             video: {
+                 facingMode: 'environment', // Preferir cámara trasera
+                 width: { ideal: 640 }, // Reducir resolución puede ayudar
+                 height: { ideal: 480 }
+             }
+         });
+        barcodeVideoElement.srcObject = barcodeStream;
+
+         // Esperar a que el video esté listo para reproducirse
+         await new Promise((resolve, reject) => {
+            barcodeVideoElement.onloadedmetadata = () => {
+                barcodeVideoElement.play().then(resolve).catch(reject);
+            };
+            barcodeVideoElement.onerror = (e) => reject(`Error en elemento video: ${e}`);
+         });
+
+        console.log("Cámara activada, iniciando decodificación continua...");
+        barcodeStatusDiv.textContent = "Buscando código...";
+
+        // 2. Crear instancia del lector
+        barcodeReader = new ZXing.BrowserMultiFormatReader();
+
+        // 3. Empezar a decodificar continuamente desde el video
+        // Se pasa el ID del elemento de video y una función callback
+        barcodeReader.decodeFromVideoDevice(undefined, 'barcodeVideo', (result, error) => {
+            // Esta función se llama repetidamente por ZXing
+
+            if (result) {
+                // --- ¡Código de barras encontrado! ---
+                console.log("Código de barras detectado:", result);
+                barcodeStatusDiv.textContent = "¡Código detectado!";
+                const barcodeText = result.getText();
+                barcodeResultDiv.textContent = `Código detectado: ${barcodeText}`;
+
+                // Detener TODO (scanner y cámara) al encontrar resultado
+                stopBarcodeScanner(); // <-- LLAMAR A LA FUNCIÓN DE PARADA
+
+                // Buscar producto y luego explicarlo
+                lookupBarcode(barcodeText);
+            }
+
+            if (error) {
+                // Ignorar NotFoundException, es normal mientras no hay código
+                if (!(error instanceof ZXing.NotFoundException)) {
+                     console.error("Error de escaneo continuo:", error);
+                     barcodeStatusDiv.textContent = `Error de escaneo: ${error.message}`;
+                     // Considera detener si el error persiste o es grave
+                     // stopBarcodeScanner();
+                }
+                 // Si es NotFoundException, simplemente no hace nada, ZXing sigue intentando
+            }
+        }); // Fin de decodeFromVideoDevice
+
+    } catch (err) {
+        console.error("Error al iniciar la cámara o el escáner:", err);
+        barcodeStatusDiv.textContent = `Error al iniciar: ${err.message}`;
+        stopBarcodeScanner(); // Asegurarse de limpiar si falla al inicio
+    }
+}
+
+    // Función para manejar código detectado
+    function handleBarcodeSuccess(result) {
+        const code = result.getText();
+        barcodeResultDiv.textContent = `Código: ${code}`;
+        barcodeStatusDiv.textContent = "¡Código detectado!";
+        stopBarcodeScanner();
+        lookupBarcode(code);
+    }
+
+    // Función para detener el escáner
+    function stopBarcodeScanner() {
+        console.log("Deteniendo scanner y cámara...");
+        if (barcodeReader) {
+            barcodeReader.reset(); // Método para detener ZXing
+            barcodeReader = null;  // Limpiar la instancia
+        }
+        if (barcodeStream) {
+            barcodeStream.getTracks().forEach(track => track.stop()); // Detener stream
+            barcodeStream = null; // Limpiar stream
+        }
+        // Limpiar el elemento de video (opcional pero buena práctica)
+        // const videoElement = document.getElementById('barcodeVideo');
+        // if (videoElement) videoElement.srcObject = null;
+    }
+
+        // Función para buscar el código de barras en Open Food Facts
+        async function lookupBarcode(barcode) {
+            console.log(`Buscando código ${barcode} en Open Food Facts...`);
+            barcodeStatusDiv.textContent = `Buscando producto para ${barcode}...`;
+            barcodeProductNameDiv.textContent = 'Producto: Buscando...';
+            barcodeResponseOutputDiv.textContent = ''; // Limpiar explicación anterior
+
+            const apiUrl = `https://world.openfoodfacts.org/api/v2/product/${barcode}.json`;
+
+            try {
+                const response = await fetch(apiUrl);
+                if (!response.ok) {
+                    throw new Error(`Error de red ${response.status} al buscar en Open Food Facts`);
+                }
+                const data = await response.json();
+
+                if (data.status === 1 && data.product?.product_name) {
+                    // Producto encontrado
+                    const productName = data.product.product_name;
+                    console.log("Producto encontrado:", productName);
+                    barcodeProductNameDiv.textContent = `Producto: ${productName}`;
+                    // Pedir a Gemini que explique el producto encontrado
+                    explainProduct(productName);
+                } else {
+                    // Producto no encontrado
+                    console.warn(`Código ${barcode} no encontrado en Open Food Facts.`);
+                    barcodeProductNameDiv.textContent = 'Producto: No encontrado';
+                    barcodeStatusDiv.textContent = `No se encontró información para el código ${barcode}.`;
+                    barcodeResponseOutputDiv.textContent = `No pude encontrar detalles para este código de barras.`;
+                }
+            } catch (error) {
+                console.error("Error al buscar en Open Food Facts:", error);
+                barcodeStatusDiv.textContent = `Error al buscar producto: ${error.message}`;
+                barcodeProductNameDiv.textContent = 'Producto: Error';
+                 barcodeResponseOutputDiv.textContent = `Hubo un problema al buscar la información del producto.`;
+            }
+        }
+
+        // Función para pedir explicación a Gemini y mostrar/leer resultado
+        async function explainProduct(productName) {
+            const prompt = `Explica brevemente y de forma sencilla qué es este producto y su contenido nutricional/composicion: ${productName}`;
+            console.log("Pidiendo explicación a Gemini para:", productName);
+            barcodeStatusDiv.textContent = `Pidiendo explicación para ${productName}...`;
+
+            // Reutilizar la lógica de 'Pregunta a Maria' para llamar al endpoint /ask-maria
+            try {
+                const response = await fetch('/ask-maria', { // Usar el endpoint de texto
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ prompt: prompt }) // Enviar el prompt generado
+                });
+                const responseText = await response.text(); // Recibir texto plano
+                if (!response.ok) {
+                    throw new Error(`Error ${response.status} de Gemini: ${responseText || response.statusText}`);
+                }
+
+                // Mostrar y leer la respuesta
+                barcodeResponseOutputDiv.textContent = responseText;
+                barcodeStatusDiv.textContent = `Explicación recibida para ${productName}.`;
+
+                // Llamar a la función TTS (asegúrate de que speakText o ttsPlayer exista)
+                if (typeof speakText === 'function') { // Si usas WebSpeech API
+                    speakText(responseText);
+                } else if (ttsPlayer && typeof ttsPlayer.playText === 'function') { // Si usas Talkify
+                    ttsPlayer.playText(responseText);
+                }
+
+            } catch (error) {
+                console.error("Error al pedir explicación a Gemini:", error);
+                barcodeStatusDiv.textContent = `Error al obtener explicación: ${error.message}`;
+                barcodeResponseOutputDiv.textContent = `No se pudo obtener una explicación para ${productName}.`;
+            }
+        }
+
+
+        // --- Carga Inicial ---
+        document.addEventListener('DOMContentLoaded', () => {
+            showView('launcher-view');
+            // Cargar voces para TTS si se usa WebSpeech API
+            if ('speechSynthesis' in window && typeof loadVoices === 'function') {
+                 loadVoices();
+                 if (window.speechSynthesis.getVoices().length === 0) {
+                    window.speechSynthesis.onvoiceschanged = loadVoices;
+                 }
+             }
+        });
 
         // --- Lógica Específica de MariaVision (CON Prompt Input) ---
         const videoMV = document.getElementById('videoMV');
@@ -291,6 +601,30 @@
 
         // Función para hablar el texto
         function speakText(textToSpeak) {
+
+            let cleanedText = textToSpeak;
+
+            // 1. Eliminar asteriscos de bullets al inicio de línea (con o sin espacio después)
+            //    Ej: "* Queso Crema..." -> "Queso Crema..."
+            //    Ej: "* Nata..." -> "Nata..."
+            cleanedText = cleanedText.replace(/^\s*[\*\-•]\s*/gm, ''); // Quita *, -, • al inicio de línea + espacios
+
+             // 2. Eliminar dobles asteriscos usados para énfasis (negrita en Markdown)
+             //    Ej: "**Queso Crema**" -> "Queso Crema"
+             cleanedText = cleanedText.replace(/\*\*/g, '');
+
+            // 3. (Opcional) Eliminar emojis comunes si causan problemas.
+            //    Esto es más complejo, empezamos sin ello. Si un emoji específico te molesta,
+            //    podríamos añadir: cleanedText = cleanedText.replace(/❓/g, ''); por ejemplo.
+            //    O usar rangos Unicode más complejos para quitar más emojis.
+
+            // 4. Reemplazar saltos de línea múltiples por uno solo (mejora fluidez)
+            cleanedText = cleanedText.replace(/\n\s*\n/g, '\n');
+
+            console.log("Texto limpiado:", cleanedText);
+            // --- FIN: Limpieza del Texto ---
+
+
             // Mejorar la selección de voz
             const voices = window.speechSynthesis.getVoices();
             console.log(voices)
@@ -302,7 +636,7 @@
                         voices.find(v => v.lang.startsWith('es-ES'));
             
             // Configuración mejorada
-            const utterance = new SpeechSynthesisUtterance(textToSpeak);
+            const utterance = new SpeechSynthesisUtterance(cleanedText);
             utterance.voice = voice;
             utterance.lang = voice ? voice.lang : 'es-ES';
             utterance.rate = 0.9; // Velocidad más natural

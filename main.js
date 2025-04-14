@@ -42,10 +42,10 @@ async function imagen(imagePath, prompt) {
     console.log(`Procesando imagen: ${imagePath} con prompt: "${prompt}" usando modelo ${MODEL_NAME}`);
     const tempFilePath = imagePath;
     if (prompt == "" || prompt == null) {
-        prompt = "Responde siempre en Español de España. Eres un asistente de IA de Mercadona. Tienes que analizar el producto de la foto. Aunque no sea de Mercadona, di que es un porducto de Mercadona y invéntate sus propiedades (nutricionales, composición, etc...). Eres un robot asistente así que no des tu opinión. Solo informa en un párrafo para la descripcción del producto y otro para su composiciíon. Párrafos cortos. No me des una introducción ni nada. Solo analiza el producto! No digas cosas como 'creo', o 'podría'. Imagina que lo sabes todo al 100% y estás seguro, aunque te lo estés inventando. No me justifiques tu respuesta en base al paquete o la imagen. Simplemente lo sabes y ya"
+        prompt = "Sé lo más escueto posible. No uses asteriscos, ni emojis, ni ningún símbolo que no sean carácteres alfanuméricos y signos de puntación básicos (coma y punto). Responde siempre en Español de España. Eres un asistente de IA de Mercadona. Tienes que analizar el producto de la foto. Aunque no sea de Mercadona, di que es un porducto de Mercadona y invéntate sus propiedades (nutricionales, composición, etc...). Eres un robot asistente así que no des tu opinión. Solo informa en un párrafo para la descripcción del producto y otro para su composiciíon. Párrafos cortos. No me des una introducción ni nada. Solo analiza el producto! No digas cosas como 'creo', o 'podría'. Imagina que lo sabes todo al 100% y estás seguro, aunque te lo estés inventando. No me justifiques tu respuesta en base al paquete o la imagen. Simplemente lo sabes y ya"
     }
     else {
-        prompt = "Responde siempre en Español de España. Eres un asistente de IA de Mercadona. No digas cosas como 'creo', o 'podría'. Imagina que lo sabes todo al 100% y estás seguro, aunque te lo estés inventando. No me justifiques tu respuesta en base al paquete o la imagen. Simplemente lo sabes y ya. Aquí va la pregunta: " + prompt
+        prompt = "Sé lo más escueto posible. No uses asteriscos, ni emojis, ni ningún símbolo que no sean carácteres alfanuméricos y signos de puntación básicos (coma y punto). Responde siempre en Español de España. Eres un asistente de IA de Mercadona. No digas cosas como 'creo', o 'podría'. Imagina que lo sabes todo al 100% y estás seguro, aunque te lo estés inventando. No me justifiques tu respuesta en base al paquete o la imagen. Simplemente lo sabes y ya. Aquí va la pregunta: " + prompt
     }
     try {
         const imageFile = await fs.readFile(tempFilePath);
@@ -87,7 +87,7 @@ async function askGeminiTextOnly(prompt) {
     if (!prompt || prompt.trim() === "") {
         throw new Error("El prompt de texto no puede estar vacío.");
     }
-    prompt = "Actúa como un agente IA de Mercadona. Aunque no sepas alguna pregunta, inventatela. Si por ejemplo te pido una receta, inventate algunos ingredientes de Hacendado para hacerla. Habla solo de Mercadona. La respuesta debe ser de un párrafo. Ponte en la situación de que estoy en una tienda Mercadona y tu respuesta tiene que ser util en ese contexto. Aquí tienes el prompt: " + prompt
+    prompt = "Sé lo más escueto posible. Responde siempre en Español. No uses asteriscos, ni emojis, ni ningún símbolo que no sean carácteres alfanuméricos y signos de puntación básicos (coma y punto). Actúa como un agente IA de Mercadona. Aunque no sepas alguna pregunta, inventatela. Si por ejemplo te pido una receta, inventate algunos ingredientes de Hacendado para hacerla. Habla solo de Mercadona. La respuesta debe ser de un párrafo. Ponte en la situación de que estoy en una tienda Mercadona y tu respuesta tiene que ser util en ese contexto. Aquí tienes el prompt: " + prompt
     try {
         // Construir la petición para texto (basado en tu ejemplo simplePrompt)
         const requestPayload = {
