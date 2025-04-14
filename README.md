@@ -56,7 +56,6 @@ La aplicación permite a los usuarios interactuar mediante visión artificial, p
     * Librería `ZXingJS` (`@zxing/library`)
 
 **Backend:**
-
 * Node.js
 * Express.js (Framework web)
 * Multer (Middleware para subida de archivos - imágenes)
