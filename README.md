@@ -90,9 +90,9 @@ La aplicación permite a los usuarios interactuar mediante visión artificial, p
     * Abre el archivo `main.js` en un editor de texto.
     * Busca la línea:
         ```javascript
-        const apiKey = "AIzaSyA-1ykutvQR3nOSIPhTYQngJh6sSQ2QkeY"; // <-- PON TU API KEY REAL AQUÍ
+        const apiKey = "APIKEY"; // <-- PON TU API KEY REAL AQUÍ
         ```
-    * **IMPORTANTE:** Reemplaza el valor `"AIzaSyA-..."` con tu **API Key real** obtenida de Google AI Studio o Google Cloud Console.
+    * **IMPORTANTE:** Reemplaza el valor `"APYKEY"` con tu **API Key real** obtenida de Google AI Studio o Google Cloud Console.
     * **(Recomendación)** Para mayor seguridad, considera usar variables de entorno (ej. con el paquete `dotenv`) en lugar de pegar la clave directamente en el código, especialmente si planeas compartir o desplegar el proyecto.
 
 4.  **Inicia el servidor backend:**
