@@ -17,7 +17,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 // --- Configuración de Google GenAI (API Key Hardcoded) ---
-const apiKey = "AIzaSyA-1ykutvQR3nOSIPhTYQngJh6sSQ2QkeY"; // <-- PON TU API KEY REAL AQUÍ
+const apiKey = "APIKEY"; // <-- PON TU API KEY REAL AQUÍ
 
 const ai = new GoogleGenAI({ apiKey: apiKey });
 console.log("Google GenAI inicializado.");
